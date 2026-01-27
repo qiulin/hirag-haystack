@@ -8,28 +8,43 @@ This example demonstrates:
 
 import os
 
+from dotenv import load_dotenv
+
 from haystack.components.generators import OpenAIGenerator
 from haystack.components.embedders import OpenAITextEmbedder
-from haystack.document_stores import InMemoryDocumentStore
 
 from hirag_haystack import HiRAG, QueryParam
+from hirag_haystack.stores import EntityVectorStore, ChunkVectorStore
 
 
 def main():
     """Run basic HiRAG example."""
+
+    # Load environment variables from .env file
+    load_dotenv()
 
     # Check for API key
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("Please set OPENAI_API_KEY environment variable")
         return
+    base_url = os.getenv("OPENAI_BASE_URL")  # Optional
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Allow custom model
 
     # Initialize components
-    generator = OpenAIGenerator(model="gpt-4o-mini", api_key=api_key)
+    # Note: api_key is automatically loaded from OPENAI_API_KEY env var
+    if base_url:
+        generator = OpenAIGenerator(model=model, api_base_url=base_url, timeout=120.0)
+    else:
+        generator = OpenAIGenerator(model=model, timeout=120.0)
+
+    print(f"Using model: {model}")
+    if base_url:
+        print(f"API base URL: {base_url}")
 
     # Set up stores
-    chunk_store = InMemoryDocumentStore()
-    entity_store = InMemoryDocumentStore()
+    chunk_store = ChunkVectorStore(working_dir="./hirag_data")
+    entity_store = EntityVectorStore(working_dir="./hirag_data")
 
     # Initialize HiRAG
     hirag = HiRAG(

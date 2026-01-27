@@ -117,7 +117,6 @@ class PathFinder:
 
         return full_path
 
-    @component.output_types(paths=list, edges=list)
     def find_cross_community_paths(
         self,
         entities: List[str],
@@ -219,7 +218,6 @@ class PathFinder:
 
         return edges
 
-    @component.output_types(communities=list)
     def find_bridging_communities(
         self,
         source_entity: str,

@@ -1,4 +1,6 @@
 # flake8: noqa
+from typing import Any
+
 from hirag_haystack.core import (
     Entity,
     Relation,

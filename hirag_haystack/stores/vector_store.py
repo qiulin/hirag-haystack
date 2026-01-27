@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 from haystack.dataclasses import Document
-from haystack.document_stores import InMemoryDocumentStore
+from haystack.document_stores.in_memory import InMemoryDocumentStore
 
 
 class EntityVectorStore:
@@ -37,9 +37,7 @@ class EntityVectorStore:
         self.meta_fields = meta_fields or {"entity_name"}
         self.working_dir = working_dir
 
-        self._store = InMemoryDocumentStore(
-            embedding_function=embedding_func,
-        )
+        self._store = InMemoryDocumentStore()
         self._entity_index: dict[str, str] = {}  # entity_name -> doc_id
 
         # Load from disk if available
@@ -99,8 +97,8 @@ class EntityVectorStore:
         if not query:
             return []
 
-        # Use embedding retrieval
-        results = self._store.query(
+        # Use BM25 retrieval for text-based search
+        results = self._store.bm25_retrieval(
             query=query,
             top_k=top_k,
             filters=filters,
@@ -231,9 +229,7 @@ class ChunkVectorStore:
         self.embedding_func = embedding_func
         self.working_dir = working_dir
 
-        self._store = InMemoryDocumentStore(
-            embedding_function=embedding_func,
-        )
+        self._store = InMemoryDocumentStore()
         self._chunk_index: dict[str, dict] = {}  # chunk_id -> chunk_data
 
         # Load from disk if available
@@ -291,7 +287,7 @@ class ChunkVectorStore:
         if not query:
             return []
 
-        results = self._store.query(
+        results = self._store.bm25_retrieval(
             query=query,
             top_k=top_k,
             filters=filters,

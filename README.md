@@ -32,6 +32,27 @@ pip install -e ".[neo4j]"
 pip install -e ".[all]"
 ```
 
+## Configuration
+
+### Environment Variables
+
+The project supports loading environment variables from a `.env` file. Copy the example file and configure it:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your API key:
+
+```env
+OPENAI_API_KEY=your-openai-api-key-here
+
+# Optional: Custom API base URL
+# OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+The examples will automatically load environment variables from the `.env` file.
+
 ## Quick Start
 
 ```python

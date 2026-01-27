@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from haystack import Pipeline, PreFetcher, component
+from haystack import Pipeline, component
 from haystack.dataclasses import Document
 from haystack.components.preprocessors import DocumentSplitter
 from haystack.components.writers import DocumentWriter

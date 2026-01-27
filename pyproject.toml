@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "haystack-ai>=2.6",
     "networkx",
+    "python-dotenv",
     "python-louvain",
     "tiktoken",
 ]

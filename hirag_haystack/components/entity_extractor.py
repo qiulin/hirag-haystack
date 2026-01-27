@@ -208,9 +208,11 @@ class EntityExtractor:
         """Parse entities from LLM output."""
         entities = []
 
-        # Split by record delimiter
+        # Escape delimiters for regex and split by record delimiter
+        escaped_record = re.escape(self.record_delimiter)
+        escaped_completion = re.escape(self.completion_delimiter)
         records = re.split(
-            f"({self.record_delimiter}|{self.completion_delimiter})",
+            f"({escaped_record}|{escaped_completion})",
             text
         )
 
@@ -250,8 +252,11 @@ class EntityExtractor:
         """Parse relations from LLM output."""
         relations = []
 
+        # Escape delimiters for regex and split by record delimiter
+        escaped_record = re.escape(self.record_delimiter)
+        escaped_completion = re.escape(self.completion_delimiter)
         records = re.split(
-            f"({self.record_delimiter}|{self.completion_delimiter})",
+            f"({escaped_record}|{escaped_completion})",
             text
         )
 

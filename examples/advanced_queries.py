@@ -8,8 +8,10 @@ This example demonstrates:
 
 import os
 
+from dotenv import load_dotenv
+
 from haystack.components.generators import OpenAIGenerator
-from haystack.document_stores import InMemoryDocumentStore
+from haystack.document_stores.in_memory import InMemoryDocumentStore
 
 from hirag_haystack import HiRAG, QueryParam
 
@@ -17,12 +19,16 @@ from hirag_haystack import HiRAG, QueryParam
 def main():
     """Run advanced HiRAG query examples."""
 
+    # Load environment variables from .env file
+    load_dotenv()
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("Please set OPENAI_API_KEY environment variable")
         return
 
-    generator = OpenAIGenerator(model="gpt-4o-mini", api_key=api_key)
+    # Note: api_key is automatically loaded from OPENAI_API_KEY env var
+    generator = OpenAIGenerator(model="gpt-4o-mini")
 
     hirag = HiRAG(
         working_dir="./hirag_data",
