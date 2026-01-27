@@ -71,6 +71,7 @@ hirag_data/
 hirag_demo_data/
 hirag_cache/
 *.json.bak
+hirag_visualizations/
 
 # Test and debug files
 test_*.py

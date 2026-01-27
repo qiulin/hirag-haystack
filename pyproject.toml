@@ -46,8 +46,13 @@ openai = [
 scikit-learn = [
     "scikit-learn",
 ]
+visualization = [
+    "pyvis>=0.3.2",
+    "plotly>=5.18.0",
+    "kaleido>=0.2.0",
+]
 all = [
-    "hirag-haystack[dev,neo4j,openai,scikit-learn]",
+    "hirag-haystack[dev,neo4j,openai,scikit-learn,visualization]",
 ]
 
 [project.urls]

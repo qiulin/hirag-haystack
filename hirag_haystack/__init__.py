@@ -1,4 +1,5 @@
 # flake8: noqa
+from pathlib import Path
 from typing import Any
 
 from hirag_haystack.core import (
@@ -30,6 +31,7 @@ from hirag_haystack.components import (
     ContextBuilder,
     PathFinder,
     PathScorer,
+    GraphVisualizer,
 )
 
 __all__ = [
@@ -59,6 +61,7 @@ __all__ = [
     "ContextBuilder",
     "PathFinder",
     "PathScorer",
+    "GraphVisualizer",
     # Pipelines
     "HiRAGIndexingPipeline",
     "HiRAGQueryPipeline",
@@ -165,6 +168,11 @@ class HiRAG:
             top_m=top_m,
         )
 
+        # Initialize visualizer
+        self.visualizer = GraphVisualizer(
+            output_dir=str(Path(working_dir) / "visualizations")
+        )
+
     def index(
         self,
         documents: list[str] | str,
@@ -256,3 +264,74 @@ class HiRAG:
     def reports(self) -> dict:
         """Get community reports."""
         return self.graph_store._reports if hasattr(self.graph_store, "_reports") else {}
+
+    def visualize(
+        self,
+        kind: str = "all",
+        **kwargs
+    ) -> dict[str, str]:
+        """Generate visualizations for the knowledge graph.
+
+        This is a convenience method that uses the internal GraphVisualizer
+        to create interactive HTML visualizations.
+
+        Args:
+            kind: Type of visualization to generate:
+                  - "graph": Knowledge graph only
+                  - "communities": Community structure only
+                  - "stats": Entity statistics only
+                  - "all": Generate all visualizations (default)
+            **kwargs: Additional arguments passed to specific visualizations.
+                      Common options include:
+                      - layout: "force", "hierarchical", "circular"
+                      - color_by: "entity_type", "community", "degree"
+                      - show_labels: bool
+                      - physics: bool
+                      - filter_min_degree: int
+                      - filter_max_nodes: int
+
+        Returns:
+            Dictionary mapping visualization names to their HTML file paths.
+
+        Example:
+            ```python
+            hirag = HiRAG(working_dir="./hirag_data")
+
+            # Generate all visualizations
+            results = hirag.visualize(kind="all")
+
+            # Generate only knowledge graph
+            kg_path = hirag.visualize(kind="graph", layout="force")
+            ```
+        """
+        # Detect communities if not already done
+        if not self.communities:
+            self.graph_store._communities = self.graph_store.clustering()
+
+        if kind == "graph":
+            return {"graph": self.visualizer.visualize_knowledge_graph(
+                graph_store=self.graph_store,
+                **kwargs
+            )}
+        elif kind == "communities":
+            return {"communities": self.visualizer.visualize_communities(
+                communities=self.communities,
+                graph_store=self.graph_store,
+                **kwargs
+            )}
+        elif kind == "stats":
+            return {"stats": self.visualizer.visualize_entity_stats(
+                graph_store=self.graph_store,
+                **kwargs
+            )}
+        elif kind == "all":
+            return self.visualizer.visualize_all(
+                graph_store=self.graph_store,
+                communities=self.communities,
+                **kwargs
+            )
+        else:
+            raise ValueError(
+                f"Unknown visualization type: {kind}. "
+                "Choose from: 'graph', 'communities', 'stats', 'all'"
+            )

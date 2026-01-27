@@ -12,6 +12,7 @@ from .hierarchical_retriever import (
     ContextBuilder,
 )
 from .path_finder import PathFinder, PathScorer
+from .graph_visualizer import GraphVisualizer
 
 __all__ = [
     "EntityExtractor",
@@ -24,4 +25,5 @@ __all__ = [
     "ContextBuilder",
     "PathFinder",
     "PathScorer",
+    "GraphVisualizer",
 ]
