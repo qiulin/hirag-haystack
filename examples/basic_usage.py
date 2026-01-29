@@ -11,6 +11,7 @@ import os
 from dotenv import load_dotenv
 
 from haystack.components.generators import OpenAIGenerator
+from haystack.utils.auth import Secret
 from haystack.components.embedders import OpenAITextEmbedder
 
 from hirag_haystack import HiRAG, QueryParam
@@ -31,12 +32,17 @@ def main():
     base_url = os.getenv("OPENAI_BASE_URL")  # Optional
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Allow custom model
 
+    # Debug: Print environment variables
+    print(f"Loaded from .env:")
+    print(f"  OPENAI_API_KEY: {api_key[:10]}...{api_key[-4:] if len(api_key) > 14 else api_key}")
+    print(f"  OPENAI_BASE_URL: {base_url}")
+    print(f"  OPENAI_MODEL: {model}")
+
     # Initialize components
-    # Note: api_key is automatically loaded from OPENAI_API_KEY env var
     if base_url:
-        generator = OpenAIGenerator(model=model, api_base_url=base_url, timeout=120.0)
+        generator = OpenAIGenerator(api_key=Secret.from_token(api_key), model=model, api_base_url=base_url, timeout=120.0)
     else:
-        generator = OpenAIGenerator(model=model, timeout=120.0)
+        generator = OpenAIGenerator(api_key=Secret.from_token(api_key), model=model, timeout=120.0)
 
     print(f"Using model: {model}")
     if base_url:

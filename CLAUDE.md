@@ -110,6 +110,29 @@ Optional:
 - `openai>=1.0`: OpenAI LLMs
 - `scikit-learn`: Hierarchical clustering
 
+## Dependency Management (uv)
+
+This project uses `uv` as the dependency management tool.
+
+### Installation
+
+```bash
+# Install dependencies with uv
+uv sync
+
+# Run scripts with uv
+uv run python examples/basic_usage.py
+uv run python examples/visualizations.py
+uv run pytest tests/
+```
+
+### Why uv?
+
+- Fast dependency resolution and installation
+- Compatible with pip and PyPI
+- Better lock file support (uv.lock)
+- Virtual environment management built-in
+
 ## Implementation Notes
 
 1. **Gleaning**: Entity extraction uses a multi-pass approach to catch missed entities

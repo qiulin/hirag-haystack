@@ -53,7 +53,7 @@ def visualize_knowledge_graph_example():
         height="900px",
     )
 
-    print(f"✓ Knowledge graph saved to: {html_path}")
+    print(f"[OK] Knowledge graph saved to: {html_path}")
     print("  - Open the HTML file in your browser to explore the graph")
     print("  - You can drag nodes, zoom in/out, and hover for details")
 
@@ -91,7 +91,7 @@ def visualize_communities_example():
         include_descriptions=True,
     )
 
-    print(f"✓ Community visualization saved to: {html_path}")
+    print(f"[OK] Community visualization saved to: {html_path}")
     print(f"  - Found {len(hirag.communities)} communities")
 
     return html_path
@@ -130,11 +130,11 @@ def visualize_query_path_example():
             include_relation_descriptions=True,
         )
 
-        print(f"✓ Path visualization saved to: {html_path}")
+        print(f"[OK] Path visualization saved to: {html_path}")
         print(f"  - Path length: {len(path)} entities")
         print(f"  - Path: {' → '.join(path)}")
     else:
-        print(f"✗ No path found between '{source}' and '{target}'")
+        print(f"[ERROR] No path found between '{source}' and '{target}'")
         print("  Try different entity names or run basic_usage.py first")
         return None
 
@@ -163,7 +163,7 @@ def visualize_statistics_example():
         show_top_n=20,
     )
 
-    print(f"✓ Statistics dashboard saved to: {html_path}")
+    print(f"[OK] Statistics dashboard saved to: {html_path}")
     print("  - Contains entity type distribution, top entities, and overview")
 
     return html_path
@@ -197,7 +197,7 @@ def visualize_all_example():
 
     print("\nGenerated visualizations:")
     for name, path in results.items():
-        print(f"  ✓ {name}: {path}")
+        print(f"  [OK] {name}: {path}")
 
     return results
 
@@ -231,7 +231,7 @@ def visualize_with_customization_example():
         height="1000px",
     )
 
-    print(f"✓ Custom visualization saved to: {html_path}")
+    print(f"[OK] Custom visualization saved to: {html_path}")
     print("  - Colored by community")
     print("  - Sized by connection count")
     print("  - Filtered to top 100 connected entities")
@@ -244,15 +244,27 @@ def main():
     # Load environment variables
     load_dotenv()
 
+    # Debug: Print environment variables
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    base_url = os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     print("=" * 60)
     print("HiRAG-Haystack Visualization Examples")
     print("=" * 60)
-    print("\nThese examples require data from basic_usage.py")
+    print("\nLoaded from .env:")
+    if api_key:
+        print(f"  OPENAI_API_KEY: {api_key[:10]}...{api_key[-4:] if len(api_key) > 14 else api_key}")
+    else:
+        print(f"  OPENAI_API_KEY: (not set)")
+    print(f"  OPENAI_BASE_URL: {base_url}")
+    print(f"  OPENAI_MODEL: {model}")
+    print()
+    print("These examples require data from basic_usage.py")
     print("If no data is found, please run: python examples/basic_usage.py\n")
 
     # Check for existing data
     if not Path("./hirag_data").exists():
-        print("⚠ No HiRAG data found!")
+        print("[!] No HiRAG data found!")
         print("Please run basic_usage.py first to create sample data.")
         print("\nYou can also use your own data by setting working_dir parameter.")
         return
@@ -301,7 +313,7 @@ def main():
             webbrowser.open(f"file:///{kg_path}")
 
     except Exception as e:
-        print(f"\n✗ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
 
         traceback.print_exc()
