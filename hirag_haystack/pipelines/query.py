@@ -272,9 +272,13 @@ class HiRAGQueryPipeline:
 
         response = self.generator.run(prompt)
 
-        # Extract text from response
-        if hasattr(response, "replies"):
-            return response.replies[0].text if response.replies else str(response)
+        # Extract text from response (response is a dict from Haystack generators)
+        if isinstance(response, dict) and "replies" in response:
+            replies = response["replies"]
+            if replies and len(replies) > 0:
+                return replies[0]
+
+        # Fallback for unexpected response format
         return str(response)
 
     @property

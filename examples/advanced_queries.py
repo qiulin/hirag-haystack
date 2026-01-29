@@ -37,6 +37,43 @@ def main():
         top_m=10,
     )
 
+    # Sample documents for indexing
+    documents = """
+    # Artificial Intelligence
+
+    Artificial Intelligence (AI) is a branch of computer science focused on creating
+    systems capable of performing tasks that typically require human intelligence.
+    These tasks include learning, reasoning, problem-solving, perception, and
+    language understanding.
+
+    ## Machine Learning
+
+    Machine Learning (ML) is a subset of AI that focuses on algorithms that can
+    learn from data. Key approaches include supervised learning, unsupervised
+    learning, and reinforcement learning. Deep Learning, a subset of ML, uses
+    neural networks with multiple layers.
+
+    ## Natural Language Processing
+
+    Natural Language Processing (NLP) is another important area of AI. It deals
+    with the interaction between computers and human language. Applications include
+    machine translation, sentiment analysis, and question answering systems.
+
+    Large Language Models (LLMs) like GPT have revolutionized NLP by demonstrating
+    impressive capabilities in text generation, understanding, and reasoning.
+
+    ## Knowledge Graphs
+
+    Knowledge graphs represent information as a network of entities and their
+    relationships. They are used in various applications including search engines,
+    recommendation systems, and AI reasoning. GraphRAG and HiRAG are approaches
+    that combine knowledge graphs with retrieval-augmented generation.
+    """
+
+    print("Indexing documents...")
+    result = hirag.index(documents)
+    print(f"Indexed: {result}\n")
+
     # Example 1: Get context without generation
     print("=" * 60)
     print("Example 1: Context-only retrieval")
