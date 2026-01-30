@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from haystack.dataclasses import Document
 
 from hirag_haystack import HiRAG, QueryParam
+from hirag_haystack.document_loader import DocumentLoader
 from hirag_haystack.api.dependencies import (
     get_hirag,
     run_in_executor,
@@ -25,8 +26,10 @@ from hirag_haystack.api.dependencies import (
 from hirag_haystack.api.models import (
     BatchDeleteRequest,
     BatchDeleteResponse,
+    DocumentInput,
     DocumentListResponse,
     DocumentUpdateRequest,
+    DocumentUrlInput,
     GraphStatsResponse,
     HealthResponse,
     IndexRequest,
@@ -106,13 +109,46 @@ async def index_documents(
     Documents are processed to extract entities and relations,
     detect communities, and generate community reports.
 
+    Supports both content-based documents (DocumentInput) and URL-based
+    documents (DocumentUrlInput). URLs can point to PDF, DOCX, HTML,
+    Markdown, XLSX, CSV, or TXT files.
+
     Use project_id query parameter for multi-project isolation.
     """
     # Convert request documents to Haystack Documents
-    documents = []
+    documents: list[Document] = []
+    urls_to_load: list[str] = []
+
     for doc in request.documents:
-        meta = doc.meta or {}
-        documents.append(Document(id=doc.id, content=doc.content, meta=meta))
+        if isinstance(doc, DocumentUrlInput):
+            # Collect URLs for batch loading
+            urls_to_load.append(doc.url)
+        else:
+            # DocumentInput: create Document directly
+            meta = doc.meta or {}
+            documents.append(Document(id=doc.id, content=doc.content, meta=meta))
+
+    # Load documents from URLs if any
+    if urls_to_load:
+        loader = DocumentLoader()
+        for url in urls_to_load:
+            try:
+                loaded_docs = loader.load([url])
+                # Find the corresponding input to get metadata
+                for doc_input in request.documents:
+                    if isinstance(doc_input, DocumentUrlInput) and doc_input.url == url:
+                        for loaded_doc in loaded_docs:
+                            if doc_input.meta:
+                                if loaded_doc.meta is None:
+                                    loaded_doc.meta = {}
+                                loaded_doc.meta.update(doc_input.meta)
+                        break
+                documents.extend(loaded_docs)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to load URL '{url}': {str(e)}")
+
+    if not documents:
+        raise HTTPException(status_code=400, detail="No valid documents to index")
 
     # Use project_id if provided, else default
     pid = project_id or "default"

@@ -63,10 +63,26 @@ class DocumentInput(BaseModel):
     meta: dict | None = Field(default=None, description="Optional metadata")
 
 
+class DocumentUrlInput(BaseModel):
+    """Document URL input for indexing.
+
+    Loads document content from a URL (http/https).
+    Supports PDF, DOCX, HTML, Markdown, XLSX, CSV, TXT files.
+    """
+
+    url: str = Field(
+        ...,
+        description="Document URL (http/https)",
+    )
+    meta: dict | None = Field(default=None, description="Optional metadata")
+
+
 class IndexRequest(BaseModel):
     """Native HiRAG index request."""
 
-    documents: list[DocumentInput] = Field(..., min_length=1, description="Documents to index")
+    documents: list[DocumentInput | DocumentUrlInput] = Field(
+        ..., min_length=1, description="Documents to index (content or URL)"
+    )
     incremental: bool = Field(default=True, description="Skip already-indexed documents")
     force_reindex: bool = Field(default=False, description="Force reindex all documents")
 
