@@ -1,6 +1,6 @@
 # flake8: noqa
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from haystack.dataclasses import Document
 
@@ -72,11 +72,21 @@ __all__ = [
     "HiRAGQueryPipeline",
     # High-level API
     "HiRAG",
+    # Types
+    "ProjectPipelines",
     # Document loading
     "DocumentLoader",
 ]
 
 __version__ = "0.1.0"
+
+
+class ProjectPipelines(NamedTuple):
+    """Per-project pipeline components."""
+
+    indexing_pipeline: HiRAGIndexingPipeline
+    query_pipeline: HiRAGQueryPipeline
+    graph_store: GraphDocumentStore
 
 
 class HiRAG:
@@ -143,31 +153,31 @@ class HiRAG:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
-        # Per-project pipeline cache: project_id -> (indexing, query, graph_store)
-        self._project_pipelines: dict[str, tuple] = {}
+        # Per-project pipeline cache: project_id -> ProjectPipelines
+        self._project_pipelines: dict[str, ProjectPipelines] = {}
 
         # Pre-create the "default" project for backward compatibility
         default = self._create_project_pipelines("default")
         self._project_pipelines["default"] = default
 
         # Backward-compatible aliases pointing to the default project
-        self.indexing_pipeline = default[0]
-        self.query_pipeline = default[1]
-        self.graph_store = default[2]
+        self.indexing_pipeline = default.indexing_pipeline
+        self.query_pipeline = default.query_pipeline
+        self.graph_store = default.graph_store
 
         # Initialize visualizer
         self.visualizer = GraphVisualizer(output_dir=str(Path(working_dir) / "visualizations"))
 
     # ===== Project Pipeline Management =====
 
-    def _create_project_pipelines(self, project_id: str) -> tuple:
+    def _create_project_pipelines(self, project_id: str) -> ProjectPipelines:
         """Create isolated stores and pipelines for a project.
 
         Args:
             project_id: Project identifier used for directory and namespace isolation.
 
         Returns:
-            Tuple of (indexing_pipeline, query_pipeline, graph_store).
+            ProjectPipelines containing (indexing_pipeline, query_pipeline, graph_store).
         """
         project_dir = str(Path(self.working_dir) / project_id)
         namespace = f"hirag_{project_id}"
@@ -216,10 +226,14 @@ class HiRAG:
             top_m=self.top_m,
         )
 
-        return (indexing_pipeline, query_pipeline, graph_store)
+        return ProjectPipelines(
+            indexing_pipeline=indexing_pipeline,
+            query_pipeline=query_pipeline,
+            graph_store=graph_store,
+        )
 
-    def _get_project(self, project_id: str) -> tuple:
-        """Return cached (indexing_pipeline, query_pipeline, graph_store) for a project.
+    def _get_project(self, project_id: str) -> ProjectPipelines:
+        """Return cached ProjectPipelines for a project.
 
         Lazily creates and caches pipelines on first access.
 
@@ -227,7 +241,7 @@ class HiRAG:
             project_id: Project identifier.
 
         Returns:
-            Tuple of (indexing_pipeline, query_pipeline, graph_store).
+            ProjectPipelines containing (indexing_pipeline, query_pipeline, graph_store).
         """
         if project_id not in self._project_pipelines:
             self._project_pipelines[project_id] = self._create_project_pipelines(project_id)
@@ -242,7 +256,7 @@ class HiRAG:
         Returns:
             GraphDocumentStore instance for the project.
         """
-        return self._get_project(project_id)[2]
+        return self._get_project(project_id).graph_store
 
     def index(
         self,
@@ -264,7 +278,7 @@ class HiRAG:
         Returns:
             Dictionary with indexing statistics.
         """
-        indexing_pipeline = self._get_project(project_id)[0]
+        indexing_pipeline = self._get_project(project_id).indexing_pipeline
         if incremental:
             return indexing_pipeline.index_incremental(documents, force_reindex=force_reindex)
         return indexing_pipeline.index(documents)
@@ -291,7 +305,7 @@ class HiRAG:
                 - context: Retrieved context
                 - mode: Actual mode used
         """
-        query_pipeline = self._get_project(project_id)[1]
+        query_pipeline = self._get_project(project_id).query_pipeline
         return query_pipeline.query(query, mode=mode, param=param)
 
     def query_local(
@@ -358,7 +372,7 @@ class HiRAG:
         Returns:
             Dictionary with deletion statistics.
         """
-        indexing_pipeline = self._get_project(project_id)[0]
+        indexing_pipeline = self._get_project(project_id).indexing_pipeline
         if isinstance(doc_ids, str):
             return indexing_pipeline.delete_document(doc_ids)
         return indexing_pipeline.delete_documents(doc_ids)
@@ -374,7 +388,7 @@ class HiRAG:
         Returns:
             Dictionary with update statistics.
         """
-        indexing_pipeline = self._get_project(project_id)[0]
+        indexing_pipeline = self._get_project(project_id).indexing_pipeline
         return indexing_pipeline.update_document(doc_id, content)
 
     def list_documents(self, project_id: str = "default") -> list[str]:
@@ -386,7 +400,7 @@ class HiRAG:
         Returns:
             Sorted list of doc_id strings.
         """
-        indexing_pipeline = self._get_project(project_id)[0]
+        indexing_pipeline = self._get_project(project_id).indexing_pipeline
         return indexing_pipeline.list_documents()
 
     def has_document(self, doc_id: str, project_id: str = "default") -> bool:
@@ -399,7 +413,7 @@ class HiRAG:
         Returns:
             True if the doc_id exists, False otherwise.
         """
-        indexing_pipeline = self._get_project(project_id)[0]
+        indexing_pipeline = self._get_project(project_id).indexing_pipeline
         return indexing_pipeline.has_document(doc_id)
 
     @property
@@ -453,7 +467,7 @@ class HiRAG:
             kg_path = hirag.visualize(kind="graph", layout="force")
             ```
         """
-        graph_store = self._get_project(project_id)[2]
+        graph_store = self._get_project(project_id).graph_store
         communities = graph_store._communities if hasattr(graph_store, "_communities") else {}
 
         # Detect communities if not already done
