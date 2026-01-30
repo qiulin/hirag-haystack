@@ -2,6 +2,8 @@
 from pathlib import Path
 from typing import Any
 
+from haystack.dataclasses import Document
+
 from hirag_haystack.core import (
     Entity,
     Relation,
@@ -33,6 +35,7 @@ from hirag_haystack.components import (
     PathScorer,
     GraphVisualizer,
 )
+from hirag_haystack.document_loader import DocumentLoader
 
 __all__ = [
     # Core
@@ -67,6 +70,8 @@ __all__ = [
     "HiRAGQueryPipeline",
     # High-level API
     "HiRAG",
+    # Document loading
+    "DocumentLoader",
 ]
 
 __version__ = "0.1.0"
@@ -177,14 +182,17 @@ class HiRAG:
 
     def index(
         self,
-        documents: list[str] | str,
+        documents: list[str] | str | list[Document],
         incremental: bool = False,
         force_reindex: bool = False,
     ) -> dict:
         """Index documents into the HiRAG system.
 
         Args:
-            documents: Documents to index. Can be a string or list of strings.
+            documents: Documents to index. Can be:
+                - A string (treated as single document content)
+                - A list of strings (each treated as document content)
+                - A list of Haystack Document objects
             incremental: If True, only index new documents (incremental update).
             force_reindex: If True, reindex all documents (ignores existing).
 

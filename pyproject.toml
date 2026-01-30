@@ -28,6 +28,8 @@ dependencies = [
     "python-dotenv",
     "python-louvain",
     "tiktoken",
+    "click>=8.0",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
@@ -51,9 +53,19 @@ visualization = [
     "plotly>=5.18.0",
     "kaleido>=0.2.0",
 ]
-all = [
-    "hirag-haystack[dev,neo4j,openai,scikit-learn,visualization]",
+cli = [
+    "pypdf",           # PDF
+    "python-docx",     # DOCX
+    "boilerpy3",       # HTML
+    "markdown-it-py",  # Markdown
+    "openpyxl",        # XLSX
 ]
+all = [
+    "hirag-haystack[dev,neo4j,openai,scikit-learn,visualization,cli]",
+]
+
+[project.scripts]
+hirag = "hirag_haystack.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/hirag-haystack"
