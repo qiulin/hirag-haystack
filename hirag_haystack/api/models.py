@@ -93,6 +93,69 @@ class GraphStatsResponse(BaseModel):
 
 
 # ============================================================================
+# Document Management Models
+# ============================================================================
+
+
+class DocumentListResponse(BaseModel):
+    """Response for listing documents."""
+
+    doc_ids: list[str]
+    count: int
+
+
+class DocumentUpdateRequest(BaseModel):
+    """Request for updating a document."""
+
+    content: str = Field(..., min_length=1, description="New document content")
+    meta: dict | None = Field(default=None, description="Optional metadata")
+
+
+class BatchDeleteRequest(BaseModel):
+    """Request for batch deleting documents."""
+
+    doc_ids: list[str] = Field(..., min_length=1, description="Document IDs to delete")
+
+
+class BatchDeleteResponse(BaseModel):
+    """Response for batch delete operation."""
+
+    deleted_count: int
+    doc_ids: list[str]
+
+
+# ============================================================================
+# Visualization Models
+# ============================================================================
+
+
+class VisualizeRequest(BaseModel):
+    """Request for generating visualizations."""
+
+    kind: Literal["graph", "communities", "stats", "all"] = Field(
+        default="all",
+        description="Type of visualization to generate",
+    )
+    layout: str | None = Field(
+        default=None,
+        description="Layout algorithm (force, hierarchical, circular)",
+    )
+    color_by: str | None = Field(
+        default=None,
+        description="Coloring scheme (entity_type, community, degree)",
+    )
+
+
+class VisualizeResponse(BaseModel):
+    """Response containing visualization file paths."""
+
+    files: dict[str, str] = Field(
+        ...,
+        description="Mapping of visualization name to file path",
+    )
+
+
+# ============================================================================
 # OpenAI-Compatible API Models
 # ============================================================================
 

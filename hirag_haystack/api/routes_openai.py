@@ -9,7 +9,7 @@ Endpoints:
 - POST /v1/chat/completions - Chat completions (streaming + non-streaming)
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from hirag_haystack import HiRAG, QueryParam
@@ -50,6 +50,7 @@ async def list_models() -> OpenAIModelList:
 @router.post("/chat/completions")
 async def chat_completions(
     request: ChatCompletionRequest,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
     hirag: HiRAG = Depends(get_hirag),
 ):
     """Create a chat completion.
@@ -70,6 +71,8 @@ async def chat_completions(
     - top_k: Number of entities to retrieve
     - top_m: Key entities per community
     - response_type: Expected response format
+
+    Use project_id query parameter for multi-project isolation.
     """
     # Extract the last user message as the query
     user_message = _extract_last_user_message(request.messages)
@@ -93,10 +96,13 @@ async def chat_completions(
         response_type=request.response_type,
     )
 
+    # Use project_id if provided, else default
+    pid = project_id or "default"
+
     if request.stream:
         # Streaming response
         return StreamingResponse(
-            _stream_chat_completion(hirag, user_message, mode, param, request.model),
+            _stream_chat_completion(hirag, user_message, mode, param, request.model, pid),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -108,7 +114,7 @@ async def chat_completions(
         # Non-streaming response
         try:
             result = await run_in_executor(
-                lambda: hirag.query(query=user_message, mode=mode, param=param)
+                lambda: hirag.query(query=user_message, mode=mode, param=param, project_id=pid)
             )
         except Exception as e:
             error_response = ErrorResponse(
@@ -137,6 +143,7 @@ async def _stream_chat_completion(
     mode: str,
     param: QueryParam,
     model: str,
+    project_id: str = "default",
 ):
     """Generate streaming chat completion response.
 
@@ -147,7 +154,7 @@ async def _stream_chat_completion(
     try:
         # Run the full query in executor
         result = await run_in_executor(
-            lambda: hirag.query(query=query, mode=mode, param=param)
+            lambda: hirag.query(query=query, mode=mode, param=param, project_id=project_id)
         )
         answer = result.get("answer", "")
 

@@ -5,9 +5,15 @@ Endpoints:
 - POST /api/query - Query the knowledge graph
 - POST /api/index - Index documents
 - GET /api/graph/stats - Get graph statistics
+- GET /api/documents - List all documents
+- HEAD /api/documents/{doc_id} - Check if document exists
+- PUT /api/documents/{doc_id} - Update a document
+- DELETE /api/documents/{doc_id} - Delete a document
+- POST /api/documents/batch-delete - Batch delete documents
+- POST /api/visualize - Generate visualizations
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from haystack.dataclasses import Document
 
 from hirag_haystack import HiRAG, QueryParam
@@ -17,12 +23,18 @@ from hirag_haystack.api.dependencies import (
     run_index_with_lock,
 )
 from hirag_haystack.api.models import (
+    BatchDeleteRequest,
+    BatchDeleteResponse,
+    DocumentListResponse,
+    DocumentUpdateRequest,
     GraphStatsResponse,
     HealthResponse,
     IndexRequest,
     IndexResponse,
     QueryRequest,
     QueryResponse,
+    VisualizeRequest,
+    VisualizeResponse,
 )
 
 router = APIRouter(prefix="/api", tags=["hirag"])
@@ -40,6 +52,7 @@ async def health_check() -> HealthResponse:
 @router.post("/query", response_model=QueryResponse)
 async def query(
     request: QueryRequest,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
     hirag: HiRAG = Depends(get_hirag),
 ) -> QueryResponse:
     """Query the HiRAG knowledge graph.
@@ -51,6 +64,8 @@ async def query(
     - hi_bridge: Cross-community path finding
     - hi_nobridge: Local + global without paths
     - hi: Full hierarchical (local + global + bridge)
+
+    Use project_id query parameter for multi-project isolation.
     """
     # Build query parameters
     param = QueryParam(
@@ -61,10 +76,13 @@ async def query(
         only_need_context=request.only_need_context,
     )
 
+    # Use project_id if provided, else default
+    pid = project_id or "default"
+
     try:
         # Run query in thread executor to avoid blocking
         result = await run_in_executor(
-            lambda: hirag.query(query=request.query, mode=request.mode, param=param)
+            lambda: hirag.query(query=request.query, mode=request.mode, param=param, project_id=pid)
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
@@ -80,18 +98,24 @@ async def query(
 @router.post("/index", response_model=IndexResponse)
 async def index_documents(
     request: IndexRequest,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
     hirag: HiRAG = Depends(get_hirag),
 ) -> IndexResponse:
     """Index documents into the HiRAG system.
 
     Documents are processed to extract entities and relations,
     detect communities, and generate community reports.
+
+    Use project_id query parameter for multi-project isolation.
     """
     # Convert request documents to Haystack Documents
     documents = []
     for doc in request.documents:
         meta = doc.meta or {}
         documents.append(Document(content=doc.content, meta=meta))
+
+    # Use project_id if provided, else default
+    pid = project_id or "default"
 
     try:
         # Run indexing with lock to prevent concurrent writes
@@ -100,6 +124,7 @@ async def index_documents(
                 documents=documents,
                 incremental=request.incremental,
                 force_reindex=request.force_reindex,
+                project_id=pid,
             )
         )
     except Exception as e:
@@ -119,16 +144,22 @@ async def index_documents(
 
 @router.get("/graph/stats", response_model=GraphStatsResponse)
 async def get_graph_stats(
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
     hirag: HiRAG = Depends(get_hirag),
 ) -> GraphStatsResponse:
     """Get statistics about the knowledge graph.
 
     Returns counts of entities, relations, communities, and chunks.
+
+    Use project_id query parameter for multi-project isolation.
     """
+    # Use project_id if provided, else default
+    pid = project_id or "default"
 
     def _get_stats() -> tuple[int, int, int, int]:
         """Get graph statistics (runs in executor)."""
-        graph_store = hirag.graph_store
+        # Get project-specific graph store
+        graph_store = hirag._get_project(pid)[2]
 
         # Entity count
         entities = graph_store.get_all_entities() if hasattr(graph_store, "get_all_entities") else []
@@ -139,7 +170,7 @@ async def get_graph_stats(
         relations_count = len(relations)
 
         # Community count
-        communities = hirag.communities or {}
+        communities = graph_store._communities if hasattr(graph_store, "_communities") else {}
         communities_count = len(communities)
 
         # Chunk count
@@ -162,3 +193,176 @@ async def get_graph_stats(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+
+# ============================================================================
+# Document Management Endpoints
+# ============================================================================
+
+
+@router.get("/documents", response_model=DocumentListResponse)
+async def list_documents(
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
+    hirag: HiRAG = Depends(get_hirag),
+) -> DocumentListResponse:
+    """List all document IDs in the system.
+
+    Returns a list of external document IDs that have been indexed.
+
+    Use project_id query parameter for multi-project isolation.
+    """
+    pid = project_id or "default"
+
+    try:
+        doc_ids = await run_in_executor(lambda: hirag.list_documents(project_id=pid))
+        return DocumentListResponse(doc_ids=doc_ids, count=len(doc_ids))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
+
+
+@router.head("/documents/{doc_id}")
+async def check_document(
+    doc_id: str,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
+    hirag: HiRAG = Depends(get_hirag),
+) -> Response:
+    """Check if a document exists.
+
+    Returns 200 if document exists, 404 if not.
+
+    Use project_id query parameter for multi-project isolation.
+    """
+    pid = project_id or "default"
+
+    try:
+        exists = await run_in_executor(lambda: hirag.has_document(doc_id, project_id=pid))
+        if exists:
+            return Response(status_code=200)
+        return Response(status_code=404)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check document: {str(e)}")
+
+
+@router.put("/documents/{doc_id}", response_model=IndexResponse)
+async def update_document(
+    doc_id: str,
+    request: DocumentUpdateRequest,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
+    hirag: HiRAG = Depends(get_hirag),
+) -> IndexResponse:
+    """Update a document's content.
+
+    Deletes the existing document and re-indexes with new content.
+
+    Use project_id query parameter for multi-project isolation.
+    """
+    pid = project_id or "default"
+
+    try:
+        result = await run_index_with_lock(
+            lambda: hirag.update(doc_id=doc_id, content=request.content, project_id=pid)
+        )
+        return IndexResponse(
+            status=result.get("status", "updated"),
+            documents_count=result.get("documents_count"),
+            new_documents=result.get("new_documents"),
+            chunks_count=result.get("chunks_count"),
+            new_chunks=result.get("new_chunks"),
+            entities_count=result.get("entities_count"),
+            relations_count=result.get("relations_count"),
+            communities_count=result.get("communities_count"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update document: {str(e)}")
+
+
+@router.delete("/documents/{doc_id}")
+async def delete_document(
+    doc_id: str,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
+    hirag: HiRAG = Depends(get_hirag),
+) -> dict:
+    """Delete a single document by ID.
+
+    Removes the document and all associated data (chunks, entities, relations).
+
+    Use project_id query parameter for multi-project isolation.
+    """
+    pid = project_id or "default"
+
+    try:
+        result = await run_index_with_lock(
+            lambda: hirag.delete(doc_ids=doc_id, project_id=pid)
+        )
+        return {
+            "status": "deleted",
+            "doc_id": doc_id,
+            **result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+
+@router.post("/documents/batch-delete", response_model=BatchDeleteResponse)
+async def batch_delete_documents(
+    request: BatchDeleteRequest,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
+    hirag: HiRAG = Depends(get_hirag),
+) -> BatchDeleteResponse:
+    """Batch delete multiple documents.
+
+    Removes multiple documents and all associated data.
+
+    Use project_id query parameter for multi-project isolation.
+    """
+    pid = project_id or "default"
+
+    try:
+        result = await run_index_with_lock(
+            lambda: hirag.delete(doc_ids=request.doc_ids, project_id=pid)
+        )
+        return BatchDeleteResponse(
+            deleted_count=result.get("deleted_count", len(request.doc_ids)),
+            doc_ids=request.doc_ids,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to batch delete: {str(e)}")
+
+
+# ============================================================================
+# Visualization Endpoints
+# ============================================================================
+
+
+@router.post("/visualize", response_model=VisualizeResponse)
+async def visualize(
+    request: VisualizeRequest,
+    project_id: str | None = Query(None, description="Project ID for data isolation"),
+    hirag: HiRAG = Depends(get_hirag),
+) -> VisualizeResponse:
+    """Generate knowledge graph visualizations.
+
+    Creates interactive HTML visualizations for:
+    - graph: Knowledge graph with entities and relations
+    - communities: Community structure visualization
+    - stats: Entity statistics charts
+    - all: Generate all visualizations
+
+    Use project_id query parameter for multi-project isolation.
+    """
+    pid = project_id or "default"
+
+    # Build kwargs from optional parameters
+    kwargs = {}
+    if request.layout:
+        kwargs["layout"] = request.layout
+    if request.color_by:
+        kwargs["color_by"] = request.color_by
+
+    try:
+        files = await run_in_executor(
+            lambda: hirag.visualize(kind=request.kind, project_id=pid, **kwargs)
+        )
+        return VisualizeResponse(files=files)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate visualization: {str(e)}")
