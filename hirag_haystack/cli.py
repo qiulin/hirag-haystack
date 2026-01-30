@@ -233,7 +233,7 @@ def cli(ctx: click.Context, working_dir: str | None, config: Path | None, verbos
     ctx.obj["verbose"] = verbose
 
 
-@cli.command(name="add-document")
+@cli.command(name="add-documents")
 @click.argument("sources", nargs=-1, required=True)
 @click.option(
     "--incremental/--no-incremental",
@@ -283,7 +283,7 @@ def cli(ctx: click.Context, working_dir: str | None, config: Path | None, verbos
     help="Graph backend (default: networkx).",
 )
 @click.pass_context
-def add_document(
+def add_documents(
     ctx: click.Context,
     sources: tuple[str, ...],
     incremental: bool | None,
