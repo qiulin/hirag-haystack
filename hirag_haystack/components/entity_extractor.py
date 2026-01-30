@@ -10,6 +10,7 @@ from typing import Any
 
 from haystack import component
 from haystack.dataclasses import Document
+from haystack.dataclasses.chat_message import ChatMessage
 
 from hirag_haystack._logging import get_logger, trace
 from hirag_haystack.core.graph import Entity, Relation
@@ -206,7 +207,10 @@ class EntityExtractor:
             raise ValueError("Generator not configured. Provide a ChatGenerator.")
 
         self._logger.debug(f"Calling LLM (prompt_len={len(prompt)})")
-        response = self.generator.run(prompt)
+
+        # Wrap prompt in a ChatMessage for Haystack 2.x compatibility
+        message = ChatMessage.from_user(prompt)
+        response = self.generator.run(messages=[message])
         # Extract text from response based on generator type
         if hasattr(response, "replies"):
             result = response.replies[0].text if response.replies else ""

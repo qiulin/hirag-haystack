@@ -10,6 +10,7 @@ import time
 from typing import Any
 
 from haystack import Pipeline, component
+from haystack.dataclasses.chat_message import ChatMessage
 
 from hirag_haystack._logging import get_logger
 from hirag_haystack.core.query_param import QueryParam
@@ -279,13 +280,15 @@ class HiRAGQueryPipeline:
         self._logger.debug(f"Generating answer (prompt_len={len(prompt)})")
         start_time = time.time()
 
-        response = self.generator.run(prompt)
+        # Wrap prompt in a ChatMessage for Haystack 2.x compatibility
+        message = ChatMessage.from_user(prompt)
+        response = self.generator.run(messages=[message])
 
-        # Extract text from response (response is a dict from Haystack generators)
-        if isinstance(response, dict) and "replies" in response:
-            replies = response["replies"]
+        # Extract text from response
+        if hasattr(response, "replies"):
+            replies = response.replies
             if replies and len(replies) > 0:
-                answer = replies[0]
+                answer = replies[0].text if hasattr(replies[0], "text") else str(replies[0])
                 elapsed = time.time() - start_time
                 self._logger.debug(f"LLM response (len={len(answer)}, time={elapsed:.2f}s)")
                 return answer

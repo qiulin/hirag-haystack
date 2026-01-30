@@ -13,6 +13,7 @@ from typing import Any
 import click
 import yaml
 from dotenv import load_dotenv
+from haystack.utils.auth import Secret
 
 from hirag_haystack import HiRAG, QueryParam, RetrievalMode, __version__
 from hirag_haystack.document_loader import DocumentLoader
@@ -155,7 +156,9 @@ def _build_hirag(
             "OpenAI integration not installed. Run: pip install haystack-ai[openai]"
         )
 
-    generator_kwargs: dict[str, Any] = {"api_key": api_key}
+    generator_kwargs: dict[str, Any] = {}
+    if api_key:
+        generator_kwargs["api_key"] = Secret.from_token(api_key)
     if model:
         generator_kwargs["model"] = model
     if base_url:
@@ -165,11 +168,9 @@ def _build_hirag(
 
     # Create vector stores
     entity_store = EntityVectorStore(
-        namespace="entities",
         working_dir=working_dir,
     )
     chunk_store = ChunkVectorStore(
-        namespace="chunks",
         working_dir=working_dir,
     )
 
@@ -282,6 +283,12 @@ def cli(ctx: click.Context, working_dir: str | None, config: Path | None, verbos
     default=None,
     help="Graph backend (default: networkx).",
 )
+@click.option(
+    "--project-id",
+    type=str,
+    default=None,
+    help="Project ID for data isolation (default: default).",
+)
 @click.pass_context
 def add_documents(
     ctx: click.Context,
@@ -294,6 +301,7 @@ def add_documents(
     api_key: str | None,
     base_url: str | None,
     graph_backend: str | None,
+    project_id: str | None,
 ) -> None:
     """Add documents to the knowledge graph.
 
@@ -369,6 +377,7 @@ def add_documents(
     try:
         result = hirag.index(
             documents=documents,
+            project_id=project_id,
             incremental=incremental,
             force_reindex=force_reindex,
         )
@@ -464,6 +473,12 @@ def add_documents(
     default=False,
     help="Output result as JSON.",
 )
+@click.option(
+    "--project-id",
+    type=str,
+    default=None,
+    help="Project ID for data isolation (default: default).",
+)
 @click.pass_context
 def query(
     ctx: click.Context,
@@ -479,6 +494,7 @@ def query(
     graph_backend: str | None,
     stdin: bool,
     output_json: bool,
+    project_id: str | None,
 ) -> None:
     """Query the knowledge graph.
 
@@ -560,7 +576,7 @@ def query(
 
     # Execute query
     try:
-        result = hirag.query(query=query_text, mode=mode, param=param)
+        result = hirag.query(query=query_text, mode=mode, param=param, project_id=project_id)
     except Exception as e:
         raise click.ClickException(f"Query failed: {e}")
 

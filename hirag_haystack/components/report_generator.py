@@ -8,6 +8,7 @@ import json
 from typing import Any
 
 from haystack import component
+from haystack.dataclasses.chat_message import ChatMessage
 
 from hirag_haystack._logging import get_logger
 from hirag_haystack.core.community import Community
@@ -173,7 +174,9 @@ class CommunityReportGenerator:
             raise ValueError("Generator not configured.")
 
         self._logger.debug(f"Calling LLM (prompt_len={len(prompt)})")
-        response = self.generator.run(prompt)
+        # Wrap prompt in a ChatMessage for Haystack 2.x compatibility
+        message = ChatMessage.from_user(prompt)
+        response = self.generator.run(messages=[message])
         if hasattr(response, "replies"):
             result = response.replies[0].text if response.replies else ""
             self._logger.debug(f"LLM response (len={len(result)})")
