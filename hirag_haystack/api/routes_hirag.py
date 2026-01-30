@@ -138,6 +138,7 @@ async def add_documents(
                 for doc_input in request.documents:
                     if isinstance(doc_input, DocumentUrlInput) and doc_input.url == url:
                         for loaded_doc in loaded_docs:
+                            loaded_doc.id = doc_input.id
                             if doc_input.meta:
                                 if loaded_doc.meta is None:
                                     loaded_doc.meta = {}
@@ -195,7 +196,7 @@ async def get_graph_stats(
     def _get_stats() -> tuple[int, int, int, int]:
         """Get graph statistics (runs in executor)."""
         # Get project-specific graph store
-        graph_store = hirag._get_project(pid)[2]
+        graph_store = hirag.get_graph_store(pid)
 
         # Entity count
         entities = (
@@ -209,9 +210,12 @@ async def get_graph_stats(
         )
         relations_count = len(relations)
 
-        # Community count
-        communities = graph_store._communities if hasattr(graph_store, "_communities") else {}
-        communities_count = len(communities)
+        # Community count - use public property if available
+        communities_count = 0
+        if hasattr(graph_store, "get_community_count"):
+            communities_count = graph_store.get_community_count()
+        elif hasattr(graph_store, "_communities"):
+            communities_count = len(graph_store._communities)
 
         # Chunk count
         chunks_count = 0

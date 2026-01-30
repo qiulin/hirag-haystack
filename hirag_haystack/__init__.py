@@ -233,6 +233,17 @@ class HiRAG:
             self._project_pipelines[project_id] = self._create_project_pipelines(project_id)
         return self._project_pipelines[project_id]
 
+    def get_graph_store(self, project_id: str = "default") -> GraphDocumentStore:
+        """Get the graph store for a project.
+
+        Args:
+            project_id: Project identifier.
+
+        Returns:
+            GraphDocumentStore instance for the project.
+        """
+        return self._get_project(project_id)[2]
+
     def index(
         self,
         documents: list[Document],

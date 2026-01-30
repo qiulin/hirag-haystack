@@ -233,7 +233,7 @@ def cli(ctx: click.Context, working_dir: str | None, config: Path | None, verbos
     ctx.obj["verbose"] = verbose
 
 
-@cli.command()
+@cli.command(name="add-document")
 @click.argument("sources", nargs=-1, required=True)
 @click.option(
     "--incremental/--no-incremental",
@@ -283,7 +283,7 @@ def cli(ctx: click.Context, working_dir: str | None, config: Path | None, verbos
     help="Graph backend (default: networkx).",
 )
 @click.pass_context
-def index(
+def add_document(
     ctx: click.Context,
     sources: tuple[str, ...],
     incremental: bool | None,
@@ -295,20 +295,20 @@ def index(
     base_url: str | None,
     graph_backend: str | None,
 ) -> None:
-    """Index documents from files or URLs.
+    """Add documents to the knowledge graph.
 
     SOURCES can be file paths, glob patterns (e.g., "docs/*.pdf"),
     or URLs (e.g., "https://example.com/page.html").
 
     Examples:
 
-        hirag index document.pdf
+        hirag add-document document.pdf
 
-        hirag index "docs/**/*.md" --model gpt-4o
+        hirag add-document "docs/**/*.md" --model gpt-4o
 
-        hirag index https://example.com/page.html
+        hirag add-document https://example.com/page.html
 
-        hirag index file1.txt file2.txt --force-reindex
+        hirag add-document file1.txt file2.txt --force-reindex
     """
     config = ctx.obj["config"]
     index_config = config.get("index", {})
