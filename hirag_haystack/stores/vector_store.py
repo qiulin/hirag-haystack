@@ -12,6 +12,23 @@ from haystack.dataclasses import Document
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 
 
+# Monkey-patch InMemoryDocumentStore to add get_document_by_chunk_id method
+def _get_document_by_chunk_id(self, chunk_id: str) -> Optional[Document]:
+    """Get a document by its chunk ID.
+
+    Args:
+        chunk_id: The chunk ID.
+
+    Returns:
+        Document or None if not found.
+    """
+    docs = self.filter_documents(filters={"field": "id", "operator": "==", "value": chunk_id})
+    return docs[0] if docs else None
+
+
+InMemoryDocumentStore.get_document_by_chunk_id = _get_document_by_chunk_id
+
+
 class EntityVectorStore:
     """Vector store for entity embeddings.
 
