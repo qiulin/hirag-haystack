@@ -14,6 +14,7 @@ from haystack.components.generators import OpenAIGenerator
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 
 from hirag_haystack import HiRAG, QueryParam
+from hirag_haystack.stores import EntityVectorStore, ChunkVectorStore
 
 
 def main():
@@ -27,12 +28,24 @@ def main():
         print("Please set OPENAI_API_KEY environment variable")
         return
 
-    # Note: api_key is automatically loaded from OPENAI_API_KEY env var
-    generator = OpenAIGenerator(model="gpt-4o-mini")
+    base_url = os.getenv("OPENAI_BASE_URL")  # Optional
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Allow custom model
+
+    # Initialize generator with custom base URL if provided
+    if base_url:
+        generator = OpenAIGenerator(model=model, api_base_url=base_url, timeout=120.0)
+    else:
+        generator = OpenAIGenerator(model=model, timeout=120.0)
+
+    # Set up stores for entity and chunk retrieval
+    chunk_store = ChunkVectorStore(working_dir="./hirag_data")
+    entity_store = EntityVectorStore(working_dir="./hirag_data")
 
     hirag = HiRAG(
         working_dir="./hirag_data",
         generator=generator,
+        entity_store=entity_store,
+        chunk_store=chunk_store,
         top_k=20,
         top_m=10,
     )

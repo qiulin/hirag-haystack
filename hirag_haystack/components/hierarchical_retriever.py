@@ -72,12 +72,21 @@ class EntityRetriever:
         entity_names = []
 
         for doc in results:
-            entity_name = doc.meta.get("entity_name", doc.id)
+            # Handle both Document objects and dictionaries
+            if isinstance(doc, dict):
+                entity_name = doc.get("entity_name", doc.get("id", ""))
+                content = doc.get("content", "")
+                meta = doc.get("meta", {})
+            else:
+                entity_name = doc.meta.get("entity_name", doc.id)
+                content = doc.content
+                meta = doc.meta
+
             entity_names.append(entity_name)
             entities.append({
                 "entity_name": entity_name,
-                "description": doc.content,
-                "meta": doc.meta,
+                "description": content,
+                "meta": meta,
             })
 
         return {"entities": entities, "entity_names": entity_names}

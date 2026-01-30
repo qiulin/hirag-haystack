@@ -152,6 +152,8 @@ class HiRAG:
         self.indexing_pipeline = HiRAGIndexingPipeline(
             graph_store=self.graph_store,
             document_store=chunk_store,
+            entity_store=entity_store,
+            chunk_store=chunk_store,
             entity_extractor=self.entity_extractor,
             community_detector=self.community_detector,
             report_generator=self.report_generator,

@@ -142,6 +142,8 @@ class HiRAGIndexingPipeline:
         self,
         graph_store: GraphDocumentStore | None = None,
         document_store: Any = None,
+        entity_store: Any = None,
+        chunk_store: Any = None,
         entity_extractor: EntityExtractor | None = None,
         community_detector: CommunityDetector | None = None,
         report_generator: CommunityReportGenerator | None = None,
@@ -154,7 +156,9 @@ class HiRAGIndexingPipeline:
 
         Args:
             graph_store: Graph store for knowledge graph.
-            document_store: Document store for text chunks.
+            document_store: Document store for text chunks (deprecated, use chunk_store).
+            entity_store: Vector store for entity embeddings.
+            chunk_store: Vector store for text chunks.
             entity_extractor: Component for extracting entities and relations.
             community_detector: Component for detecting communities.
             report_generator: Component for generating community reports.
@@ -187,8 +191,8 @@ class HiRAGIndexingPipeline:
         )
 
         # Vector stores
-        self.entity_vector_store = None
-        self.chunk_vector_store = None
+        self.entity_vector_store = entity_store
+        self.chunk_vector_store = chunk_store or document_store
 
         # Communities storage
         self._communities: dict = {}
@@ -245,6 +249,32 @@ class HiRAGIndexingPipeline:
                 communities=self._communities,
             )
             self._reports = reports_result.get("reports", {})
+
+        # Step 6: Update vector stores
+        if self.entity_vector_store and entities:
+            entity_data = {}
+            for entity in entities:
+                entity_hash = compute_mdhash_id(entity.entity_name, prefix="ent-")
+                entity_data[entity_hash] = {
+                    "content": entity.entity_name + " " + entity.description,
+                    "entity_name": entity.entity_name,
+                    "entity_type": entity.entity_type,
+                }
+            self.entity_vector_store.upsert(entity_data)
+            self.entity_vector_store.save_to_disk()
+
+        if self.chunk_vector_store and chunks:
+            chunk_data = {}
+            for chunk in chunks:
+                chunk_hash = compute_mdhash_id(chunk.content[:200], prefix="chunk-")
+                chunk_data[chunk_hash] = {
+                    "content": chunk.content,
+                    "full_doc_id": chunk.meta.get("source_doc_id", ""),
+                    "chunk_order_index": chunk.meta.get("chunk_order_index", 0),
+                    "tokens": count_tokens(chunk.content),
+                }
+            self.chunk_vector_store.upsert(chunk_data)
+            self.chunk_vector_store.save_to_disk()
 
         # Save to disk
         self.graph_store.index_done_callback()

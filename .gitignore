@@ -89,3 +89,4 @@ nul
 
 # UV package manager
 uv.lock.bak
+/.claude/settings.local.json
