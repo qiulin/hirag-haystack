@@ -373,6 +373,17 @@ class ChunkVectorStore:
         """Get the number of chunks in the store."""
         return len(self._chunk_index)
 
+    def get_document_by_chunk_id(self, chunk_id: str) -> Optional[dict]:
+        """Get a chunk by its chunk ID.
+
+        Args:
+            chunk_id: The chunk ID.
+
+        Returns:
+            Chunk data or None if not found.
+        """
+        return self.get_by_id(chunk_id)
+
 
 class KVStore:
     """Key-value store for structured data.

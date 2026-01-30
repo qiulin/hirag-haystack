@@ -433,7 +433,7 @@ class HierarchicalRetriever:
                 chunk_ids_seen.add(chunk_id)
 
                 # Get chunk content
-                doc = self.chunk_store.get_document_by_id(chunk_id)
+                doc = self.chunk_store.get_document_by_chunk_id(chunk_id)
                 if doc:
                     content = doc.content[:200].replace("\n", " ")
                     lines.append(f"{len(chunk_ids_seen)},\"{content}\"")
