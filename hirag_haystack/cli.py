@@ -101,6 +101,11 @@ def _resolve_value(
 
 # ===== HIRAG INSTANCE BUILDER =====
 
+class HiRAGConfigError(Exception):
+    """Raised when HiRAG configuration is invalid."""
+    pass
+
+
 def _build_hirag(
     working_dir: str,
     model: str | None,
@@ -129,12 +134,15 @@ def _build_hirag(
 
     Returns:
         Configured HiRAG instance.
+
+    Raises:
+        HiRAGConfigError: If API key is missing or OpenAI integration is not installed.
     """
     # Resolve API key from environment if not provided
     api_key = api_key or os.environ.get("OPENAI_API_KEY")
 
     if not api_key:
-        raise click.ClickException(
+        raise HiRAGConfigError(
             "OpenAI API key not found. Set OPENAI_API_KEY environment variable "
             "or use --api-key flag."
         )
@@ -143,7 +151,7 @@ def _build_hirag(
     try:
         from haystack.components.generators.chat import OpenAIChatGenerator
     except ImportError:
-        raise click.ClickException(
+        raise HiRAGConfigError(
             "OpenAI integration not installed. Run: pip install haystack-ai[openai]"
         )
 
@@ -349,8 +357,8 @@ def index(
             chunk_overlap=chunk_overlap,
             verbose=verbose,
         )
-    except click.ClickException:
-        raise
+    except HiRAGConfigError as e:
+        raise click.ClickException(str(e))
     except Exception as e:
         raise click.ClickException(f"Failed to initialize HiRAG: {e}")
 
@@ -533,8 +541,8 @@ def query(
             top_m=top_m,
             verbose=verbose,
         )
-    except click.ClickException:
-        raise
+    except HiRAGConfigError as e:
+        raise click.ClickException(str(e))
     except Exception as e:
         raise click.ClickException(f"Failed to initialize HiRAG: {e}")
 
@@ -577,6 +585,160 @@ def query(
             if verbose and result.get("context"):
                 click.echo("\n--- Context ---\n")
                 click.echo(result.get("context", ""))
+
+
+@cli.command()
+@click.option(
+    "--host",
+    type=str,
+    default=None,
+    help="Bind host (default: 0.0.0.0).",
+)
+@click.option(
+    "--port",
+    type=int,
+    default=None,
+    help="Bind port (default: 8000).",
+)
+@click.option(
+    "--model",
+    type=str,
+    default=None,
+    help="LLM model name.",
+)
+@click.option(
+    "--api-key",
+    type=str,
+    default=None,
+    help="OpenAI API key.",
+)
+@click.option(
+    "--base-url",
+    type=str,
+    default=None,
+    help="API base URL for custom endpoints.",
+)
+@click.option(
+    "--graph-backend",
+    type=click.Choice(["networkx", "neo4j"]),
+    default=None,
+    help="Graph backend (default: networkx).",
+)
+@click.option(
+    "--reload/--no-reload",
+    default=False,
+    help="Enable auto-reload for development.",
+)
+@click.pass_context
+def serve(
+    ctx: click.Context,
+    host: str | None,
+    port: int | None,
+    model: str | None,
+    api_key: str | None,
+    base_url: str | None,
+    graph_backend: str | None,
+    reload: bool,
+) -> None:
+    """Start the HiRAG REST API server.
+
+    Provides both native HiRAG endpoints (/api/*) and OpenAI-compatible
+    chat completions (/v1/*) for integration with tools like Open WebUI.
+
+    Examples:
+
+        hirag serve
+
+        hirag serve --port 8080 --model gpt-4o
+
+        hirag serve --reload  # Development mode with auto-reload
+
+    Config file support (hirag.yaml):
+
+        server:
+          host: "0.0.0.0"
+          port: 8000
+
+    Environment variables:
+        HIRAG_HOST, HIRAG_PORT
+    """
+    # Check for uvicorn
+    try:
+        import uvicorn
+    except ImportError:
+        raise click.ClickException(
+            "API dependencies not installed. Run: pip install hirag-haystack[api]"
+        )
+
+    config = ctx.obj["config"]
+    server_config = config.get("server", {})
+    verbose = ctx.obj["verbose"]
+
+    # Resolve configuration values
+    working_dir = ctx.obj["working_dir"]
+    host = _resolve_value(host, server_config.get("host"), env_var="HIRAG_HOST", default="0.0.0.0")
+    port = _resolve_value(port, server_config.get("port"), env_var="HIRAG_PORT", default=8000)
+    model = _resolve_value(model, config.get("model"), default="gpt-4o-mini")
+    api_key = _resolve_value(api_key, config.get("api_key"), env_var="OPENAI_API_KEY")
+    base_url = _resolve_value(base_url, config.get("base_url"), env_var="OPENAI_BASE_URL")
+    graph_backend = _resolve_value(graph_backend, config.get("graph_backend"), default="networkx")
+
+    # Handle port as int (could come from env var as string)
+    if isinstance(port, str):
+        port = int(port)
+
+    # Print startup info
+    click.echo(f"Starting HiRAG API server...")
+    click.echo(f"  Working directory: {working_dir}")
+    click.echo(f"  Model: {model}")
+    click.echo(f"  Graph backend: {graph_backend}")
+    click.echo(f"  Host: {host}")
+    click.echo(f"  Port: {port}")
+    click.echo()
+    click.echo("Endpoints:")
+    click.echo(f"  Native API:     http://{host}:{port}/api/")
+    click.echo(f"  OpenAI API:     http://{host}:{port}/v1/")
+    click.echo(f"  Documentation:  http://{host}:{port}/docs")
+    click.echo()
+
+    # Import and configure the app
+    from hirag_haystack.api import AppConfig, create_app
+
+    app_config = AppConfig(
+        working_dir=working_dir,
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        graph_backend=graph_backend,
+    )
+
+    if reload:
+        # For reload mode, use uvicorn's factory mode
+        # Configure via environment variables for the reloaded process
+        click.echo("Running in development mode with auto-reload...")
+        click.echo("Note: Config changes require restart.")
+
+        # Store config in environment for the reloaded process
+        os.environ["_HIRAG_WORKING_DIR"] = working_dir
+        os.environ["_HIRAG_MODEL"] = model or ""
+        os.environ["_HIRAG_GRAPH_BACKEND"] = graph_backend
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
+        if base_url:
+            os.environ["OPENAI_BASE_URL"] = base_url
+
+        uvicorn.run(
+            "hirag_haystack.api.app:_create_dev_app",
+            host=host,
+            port=port,
+            reload=True,
+            reload_dirs=[str(Path(__file__).parent)],
+            factory=True,
+        )
+    else:
+        # Create app directly
+        app = create_app(config=app_config)
+        uvicorn.run(app, host=host, port=port)
 
 
 def main() -> None:
