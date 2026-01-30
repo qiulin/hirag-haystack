@@ -1,7 +1,8 @@
 """Tests for external doc_id support in HiRAG.
 
 Tests cover: DocIdIndex, graph store delete operations,
-indexing pipeline doc_id tracking, and HiRAG facade methods.
+indexing pipeline doc_id tracking, HiRAG facade methods,
+and project_id isolation.
 """
 
 import json
@@ -11,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from hirag_haystack import HiRAG
 from hirag_haystack.stores.vector_store import DocIdIndex, ChunkVectorStore, EntityVectorStore, KVStore
 from hirag_haystack.stores.networkx_store import NetworkXGraphStore
 from hirag_haystack.pipelines.indexing import HiRAGIndexingPipeline
@@ -375,3 +377,76 @@ class TestChunkVectorStoreDocId:
 
     def test_get_chunks_by_doc_id_empty(self, chunk_store):
         assert chunk_store.get_chunks_by_doc_id("nonexistent") == []
+
+
+# ===== Project ID Isolation Tests =====
+
+
+class TestProjectIdIsolation:
+    """Tests for project_id-based data isolation in HiRAG facade."""
+
+    @pytest.fixture
+    def hirag(self, tmp_dir):
+        return HiRAG(working_dir=tmp_dir)
+
+    def test_project_id_isolation(self, hirag):
+        """Index into two projects and verify each only sees its own docs."""
+        hirag.index(["AI content"], doc_ids=["d1"], project_id="proj_a")
+        hirag.index(["ML content"], doc_ids=["d2"], project_id="proj_b")
+
+        assert hirag.list_documents(project_id="proj_a") == ["d1"]
+        assert hirag.list_documents(project_id="proj_b") == ["d2"]
+
+        assert hirag.has_document("d1", project_id="proj_a")
+        assert not hirag.has_document("d1", project_id="proj_b")
+        assert hirag.has_document("d2", project_id="proj_b")
+        assert not hirag.has_document("d2", project_id="proj_a")
+
+    def test_default_project_id(self, hirag):
+        """Omitting project_id uses 'default'."""
+        hirag.index(["Default content"], doc_ids=["d0"])
+        assert hirag.list_documents() == ["d0"]
+        assert hirag.list_documents(project_id="default") == ["d0"]
+        assert hirag.has_document("d0")
+        assert hirag.has_document("d0", project_id="default")
+
+    def test_default_does_not_leak_to_other_project(self, hirag):
+        """Default project data is not visible in a named project."""
+        hirag.index(["Default content"], doc_ids=["d0"])
+        assert hirag.list_documents(project_id="other") == []
+        assert not hirag.has_document("d0", project_id="other")
+
+    def test_delete_with_project_id(self, hirag):
+        """Delete in one project does not affect another."""
+        hirag.index(["Content A"], doc_ids=["d1"], project_id="proj_a")
+        hirag.index(["Content B"], doc_ids=["d1"], project_id="proj_b")
+
+        hirag.delete("d1", project_id="proj_a")
+
+        assert not hirag.has_document("d1", project_id="proj_a")
+        assert hirag.has_document("d1", project_id="proj_b")
+
+    def test_project_pipelines_are_cached(self, hirag):
+        """Accessing the same project_id twice returns the same pipeline objects."""
+        p1 = hirag._get_project("cached_proj")
+        p2 = hirag._get_project("cached_proj")
+        assert p1[0] is p2[0]
+        assert p1[1] is p2[1]
+        assert p1[2] is p2[2]
+
+    def test_backward_compat_aliases(self, hirag):
+        """self.indexing_pipeline, query_pipeline, graph_store point to default project."""
+        default = hirag._get_project("default")
+        assert hirag.indexing_pipeline is default[0]
+        assert hirag.query_pipeline is default[1]
+        assert hirag.graph_store is default[2]
+
+    def test_project_uses_separate_directories(self, hirag):
+        """Each project stores data under {working_dir}/{project_id}/."""
+        hirag.index(["A"], doc_ids=["d1"], project_id="alpha")
+        hirag.index(["B"], doc_ids=["d2"], project_id="beta")
+
+        alpha_dir = Path(hirag.working_dir) / "alpha"
+        beta_dir = Path(hirag.working_dir) / "beta"
+        assert alpha_dir.exists()
+        assert beta_dir.exists()
