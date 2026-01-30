@@ -459,6 +459,17 @@ class KVStore:
         """Clear all data."""
         self._data.clear()
 
+    def get_document_by_chunk_id(self, chunk_id: str) -> Optional[dict]:
+        """Get a document by its chunk ID.
+
+        Args:
+            chunk_id: The chunk ID.
+
+        Returns:
+            Document data or None if not found.
+        """
+        return self.get(chunk_id)
+
     def filter_keys(self, keys: List[str]) -> List[str]:
         """Filter out keys that already exist.
 
